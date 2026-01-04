@@ -2,27 +2,55 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <title>Pixel Hra - Dom s dverami</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Hra - Final Mobile</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
             display: flex; flex-direction: column; align-items: center;
             background-color: #1a1a1a; color: white; 
             font-family: 'Press Start 2P', cursive;
-            margin: 0; padding: 20px; overflow: hidden;
+            margin: 0; padding: 0; overflow: hidden;
+            touch-action: none;
         }
         canvas {
-            border: 6px solid #444; background-color: #000;
+            border: 2px solid #444; background-color: #000;
             image-rendering: pixelated;
+            max-width: 100vw; max-height: 70vh;
         }
         .game-btn {
             position: absolute; display: none; padding: 10px 15px;
-            background: #ffcc00; border: 4px solid #000; cursor: pointer;
+            background: #ffcc00; border: 3px solid #000; cursor: pointer;
             color: black; z-index: 10;
             transform: translate(-50%, -140%);
             font-family: 'Press Start 2P', cursive;
             font-size: 10px;
-            box-shadow: 4px 4px 0px #444;
+        }
+        #mobile-controls {
+            display: grid;
+            grid-template-areas: 
+                ". up ."
+                "left . right"
+                ". down .";
+            gap: 10px; margin-top: 15px; padding: 10px;
+        }
+        .ctrl-btn {
+            width: 60px; height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            user-select: none; font-size: 24px;
+        }
+        #game-over-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        #restart-btn {
+            margin-top: 20px; padding: 15px 25px;
+            background: #ff4d4d; color: white; border: 4px solid white;
+            font-family: 'Press Start 2P', cursive; cursor: pointer;
         }
     </style>
 </head>
@@ -35,12 +63,25 @@
         <button id="sleepBtn" class="game-btn" style="background:#5d5dff;color:white">SPAT</button>
         <button id="wcBtn" class="game-btn" style="background:white;color:#664400">WC</button>
         <button id="wakeBtn" class="game-btn" style="background:white">ZBUDIT SA</button>
+        
+        <div id="game-over-overlay">
+            <h1 style="color: #ff4d4d; font-size: 20px;">GAME OVER</h1>
+            <button id="restart-btn">START OVER</button>
+        </div>
+    </div>
+
+    <div id="mobile-controls">
+        <div class="ctrl-btn" style="grid-area: up;" id="up">▲</div>
+        <div class="ctrl-btn" style="grid-area: left;" id="left">◀</div>
+        <div class="ctrl-btn" style="grid-area: right;" id="right">▶</div>
+        <div class="ctrl-btn" style="grid-area: down;" id="down">▼</div>
     </div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// TU SÚ TVOJE NÁZVY SÚBOROV Z GITHUBU
 const imgAssets = {
     player: 'ja pixel.png',
     kuchyna: 'IMG_5288.JPG',
@@ -48,47 +89,77 @@ const imgAssets = {
     obyvacka: 'IMG_5289.JPG',
     zahrada: 'IMG_5294.JPG',
     kupelna: 'IMG_5286.jpg',
+    dielna: 'IMG_5292.JPG',
     kitty: 'kitty.png',
-    sleepBubble: 'sleep_bubble.png'
+    sleepBubble: 'zzzzz.png' // OPRAVENÉ PODĽA TVOJHO SÚBORU
 };
 
 const images = {};
 let loadedCount = 0;
+const totalAssets = Object.keys(imgAssets).length;
+
 Object.keys(imgAssets).forEach(key => {
     images[key] = new Image();
     images[key].src = imgAssets[key];
-    images[key].onload = () => { if (++loadedCount === Object.keys(imgAssets).length) start(); };
+    images[key].onload = () => { checkStart(); };
+    images[key].onerror = () => { checkStart(); };
 });
 
-const player = {
-    x: 400, y: 550, w: 60, h: 85, speed: 7,
-    energy: 100, hunger: 100, hygiene: 100, bladder: 100, isSleeping: false
-};
-const kitty = { x: 350, y: 600, w: 40, h: 50 };
+function checkStart() {
+    loadedCount++;
+    if (loadedCount >= totalAssets) start();
+}
 
-let currentRoom = 'spalna'; 
-let bubbleYOffset = 0;
+let player, kitty, currentRoom, transitionAlpha, bubbleYOffset, isGameOver;
+const keys = {};
+const mobileKeys = { up: false, down: false, left: false, right: false };
 
-// Definícia dverí pre každú miestnosť
+function initGame() {
+    player = {
+        x: 400, y: 550, w: 60, h: 85, speed: 7,
+        energy: 100, hunger: 100, hygiene: 100, bladder: 100, isSleeping: false
+    };
+    kitty = { x: 350, y: 600, w: 40, h: 50 };
+    currentRoom = 'kuchyna';
+    transitionAlpha = 0;
+    isGameOver = false;
+    document.getElementById('game-over-overlay').style.display = 'none';
+}
+
+function setupMobileBtn(id, key) {
+    const btn = document.getElementById(id);
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); mobileKeys[key] = true; });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); mobileKeys[key] = false; });
+    btn.addEventListener('mousedown', () => { mobileKeys[key] = true; });
+    btn.addEventListener('mouseup', () => { mobileKeys[key] = false; });
+}
+setupMobileBtn('up', 'up'); setupMobileBtn('down', 'down');
+setupMobileBtn('left', 'left'); setupMobileBtn('right', 'right');
+
+// MAPA S DVERAMI PODĽA TVOJHO ZADANIA
 const rooms = {
-    kuchyna: { bg: 'kuchyna', next: 'spalna', doors: [{x: 400, y: 750, to: 'spalna'}] },
-    spalna: { 
-        bg: 'spalna', 
-        next: 'obyvacka', 
+    kuchyna: { bg: 'kuchyna', doors: [{x: 400, y: 750, label: 'OBYVACKA', to: 'obyvacka'}] },
+    spalna: { bg: 'spalna', doors: [{x: 400, y: 750, label: 'OBYVACKA', to: 'obyvacka'}] },
+    obyvacka: { 
+        bg: 'obyvacka', 
         doors: [
-            {x: 750, y: 400, to: 'obyvacka'}, // Dvere vpravo do obývačky
-            {x: 50, y: 400, to: 'kuchyna'}    // NOVÉ: Dvere vľavo do kuchyne
+            {x: 80, y: 400, label: 'SPALNA', to: 'spalna'},
+            {x: 720, y: 400, label: 'KUPELNA', to: 'kupelna'},
+            {x: 400, y: 80, label: 'KUCHYNA', to: 'kuchyna'},
+            {x: 400, y: 720, label: 'LEKTVARE', to: 'dielna'}
         ] 
     },
-    obyvacka: { bg: 'obyvacka', next: 'zahrada', doors: [{x: 720, y: 550, to: 'zahrada'}] },
-    zahrada: { bg: 'zahrada', next: 'kupelna', doors: [{x: 310, y: 550, to: 'kupelna'}] },
-    kupelna: { bg: 'kupelna', next: 'kuchyna', doors: [{x: 700, y: 150, to: 'kuchyna'}] }
+    dielna: { bg: 'dielna', doors: [
+        {x: 400, y: 80, label: 'OBYVACKA', to: 'obyvacka'},
+        {x: 400, y: 720, label: 'VON', to: 'zahrada'} // Tu preskočíme chodbu ak nemáš obrázok
+    ]},
+    zahrada: { bg: 'zahrada', doors: [{x: 400, y: 80, label: 'DOMOV', to: 'dielna'}] },
+    kupelna: { bg: 'kupelna', doors: [{x: 80, y: 400, label: 'OBYVACKA', to: 'obyvacka'}] }
 };
 
-const keys = {};
 window.addEventListener('keydown', e => keys[e.code] = true);
 window.addEventListener('keyup', e => keys[e.code] = false);
-
+document.getElementById('restart-btn').onclick = initGame;
 document.getElementById('wakeBtn').onclick = () => player.isSleeping = false;
 document.getElementById('sleepBtn').onclick = () => player.isSleeping = true;
 document.getElementById('eatBtn').onclick = () => player.hunger = 100;
@@ -96,70 +167,77 @@ document.getElementById('washBtn').onclick = () => player.hygiene = 100;
 document.getElementById('wcBtn').onclick = () => player.bladder = 100;
 
 function update() {
+    if (isGameOver) return;
+    if (player.energy <= 0 || player.hunger <= 0 || player.hygiene <= 0 || player.bladder <= 0) {
+        isGameOver = true;
+        document.getElementById('game-over-overlay').style.display = 'flex';
+        return;
+    }
+
     if (player.isSleeping) {
-        if (player.energy < 100) player.energy += 0.2;
+        player.energy = Math.min(100, player.energy + 0.2);
         bubbleYOffset = Math.sin(Date.now() / 300) * 10;
         updateBtnPos('wakeBtn', true);
         return; 
     }
 
     let moving = false;
-    if (keys['ArrowUp'] && player.y > 50) { player.y -= player.speed; moving = true; }
-    if (keys['ArrowDown'] && player.y < 720) { player.y += player.speed; moving = true; }
-    if (keys['ArrowLeft'] && player.x > 50) { player.x -= player.speed; moving = true; }
-    if (keys['ArrowRight'] && player.x < 720) { player.x += player.speed; moving = true; }
+    if ((keys['ArrowUp'] || mobileKeys.up) && player.y > 20) { player.y -= player.speed; moving = true; }
+    if ((keys['ArrowDown'] || mobileKeys.down) && player.y < 750) { player.y += player.speed; moving = true; }
+    if ((keys['ArrowLeft'] || mobileKeys.left) && player.x > 20) { player.x -= player.speed; moving = true; }
+    if ((keys['ArrowRight'] || mobileKeys.right) && player.x < 750) { player.x += player.speed; moving = true; }
 
     kitty.x += (player.x - 50 - kitty.x) * 0.05;
     kitty.y += (player.y + 30 - kitty.y) * 0.05;
 
-    if (moving) {
-        player.energy -= 0.03; player.hunger -= 0.02; player.hygiene -= 0.02; player.bladder -= 0.03;
-    }
+    const decay = moving ? 0.06 : 0.01;
+    player.energy = Math.max(0, player.energy - decay);
+    player.hunger = Math.max(0, player.hunger - decay);
+    player.hygiene = Math.max(0, player.hygiene - decay);
+    player.bladder = Math.max(0, player.bladder - decay);
 
-    // Detekcia prechodu dverami
-    const currentDoors = rooms[currentRoom].doors;
-    currentDoors.forEach(door => {
+    rooms[currentRoom].doors.forEach(door => {
         const dist = Math.sqrt(Math.pow(player.x + player.w/2 - door.x, 2) + Math.pow(player.y + player.h/2 - door.y, 2));
-        if (dist < 50) {
+        if (dist < 60) {
             currentRoom = door.to;
-            // Pozícia po vstupe do novej miestnosti (v strede)
-            player.x = 400; 
-            player.y = 400;
+            if(door.y > 400) player.y = 120; else if(door.y < 400) player.y = 600; else player.x = 400;
+            transitionAlpha = 1.0;
         }
     });
 
+    if (transitionAlpha > 0) transitionAlpha -= 0.05;
     hideAllBtns();
-    if (currentRoom === 'spalna' && player.x > 300 && player.x < 500 && player.y > 250 && player.y < 500) {
-        updateBtnPos('sleepBtn', true);
-    }
-    if (currentRoom === 'kuchyna' && player.y < 300) updateBtnPos('eatBtn', true);
+    if (currentRoom === 'spalna' && player.y < 400) updateBtnPos('sleepBtn', true);
+    if (currentRoom === 'kuchyna' && player.y < 400) updateBtnPos('eatBtn', true);
+    if (currentRoom === 'obyvacka' && player.y > 350 && player.y < 450) updateBtnPos('eatBtn', true);
     if (currentRoom === 'kupelna') {
-        if (player.x < 300 && player.y > 400) updateBtnPos('washBtn', true);
-        if (player.x > 500 && player.y < 400) updateBtnPos('wcBtn', true);
+        if (player.x < 300) updateBtnPos('washBtn', true);
+        if (player.x > 500) updateBtnPos('wcBtn', true);
     }
 }
 
 function updateBtnPos(id, show) {
     const btn = document.getElementById(id);
+    const rect = canvas.getBoundingClientRect();
+    const scale = rect.width / 800;
     if (show) {
         btn.style.display = "block";
-        btn.style.left = (player.x + player.w / 2) + "px";
-        btn.style.top = (player.y - 10) + "px";
+        btn.style.left = (rect.left + (player.x + player.w / 2) * scale) + "px";
+        btn.style.top = (rect.top + (player.y - 10) * scale) + "px";
     }
 }
 
 function hideAllBtns() {
     ['washBtn', 'eatBtn', 'sleepBtn', 'wcBtn', 'wakeBtn'].forEach(id => {
-        document.getElementById(id).style.display = "none";
+        const btn = document.getElementById(id);
+        if(btn) btn.style.display = "none";
     });
 }
 
 function drawStats() {
     ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
     ctx.fillRect(10, 10, 260, 120);
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(10, 10, 260, 120);
+    ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.strokeRect(10, 10, 260, 120);
     ctx.font = "10px 'Press Start 2P'";
     ctx.fillStyle = "#ff4d4d"; ctx.fillText("ENERGIA: " + Math.ceil(player.energy) + "%", 25, 35);
     ctx.fillStyle = "#ffcc00"; ctx.fillText("HLAD:    " + Math.ceil(player.hunger) + "%", 25, 60);
@@ -169,38 +247,34 @@ function drawStats() {
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(images[rooms[currentRoom].bg], 0, 0, canvas.width, canvas.height);
-
-    // Kreslenie dverí
-    rooms[currentRoom].doors.forEach(door => {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.beginPath(); ctx.arc(door.x, door.y, 20, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = "white"; 
-        ctx.font = "8px 'Press Start 2P'";
-        ctx.fillText("DVERE", door.x - 25, door.y - 30);
-    });
-
-    if (currentRoom === 'spalna') {
-        ctx.fillStyle = "rgba(0, 100, 255, 0.2)";
-        ctx.fillRect(300, 300, 200, 200); 
-        ctx.fillStyle = "white"; 
-        ctx.font = "8px 'Press Start 2P'";
-        ctx.fillText("POSTEL", 360, 290);
+    if (images[rooms[currentRoom].bg]) {
+        ctx.drawImage(images[rooms[currentRoom].bg], 0, 0, canvas.width, canvas.height);
     }
+
+    rooms[currentRoom].doors.forEach(door => {
+        const pulse = Math.sin(Date.now() / 200) * 5;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+        ctx.beginPath(); ctx.arc(door.x, door.y, 25 + pulse, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "white"; ctx.font = "8px 'Press Start 2P'";
+        ctx.fillText(door.label, door.x - 30, door.y - 40);
+    });
 
     ctx.drawImage(images.kitty, kitty.x, kitty.y, kitty.w, kitty.h);
     ctx.drawImage(images.player, player.x, player.y, player.w, player.h);
 
     if (player.isSleeping) {
-        ctx.fillStyle = "rgba(0, 0, 50, 0.5)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(images.sleepBubble, player.x - 10, player.y - 100 + bubbleYOffset, 80, 80);
+        ctx.fillStyle = "rgba(0, 0, 50, 0.5)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(images.sleepBubble, player.x - 10, player.y - 100 + bubbleYOffset, 80, 40);
     }
 
+    if (transitionAlpha > 0) {
+        ctx.fillStyle = `rgba(0,0,0,${transitionAlpha})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     drawStats();
 }
 
-function start() { loop(); }
+function start() { initGame(); loop(); }
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 </script>
 </body>
