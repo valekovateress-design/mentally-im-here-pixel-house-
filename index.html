@@ -81,7 +81,6 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// TU SÚ TVOJE NÁZVY SÚBOROV Z GITHUBU
 const imgAssets = {
     player: 'ja pixel.png',
     kuchyna: 'IMG_5288.JPG',
@@ -91,7 +90,7 @@ const imgAssets = {
     kupelna: 'IMG_5286.jpg',
     dielna: 'IMG_5292.JPG',
     kitty: 'kitty.png',
-    sleepBubble: 'zzzzz.png' // OPRAVENÉ PODĽA TVOJHO SÚBORU
+    sleepBubble: 'zzzzz.png' 
 };
 
 const images = {};
@@ -136,7 +135,6 @@ function setupMobileBtn(id, key) {
 setupMobileBtn('up', 'up'); setupMobileBtn('down', 'down');
 setupMobileBtn('left', 'left'); setupMobileBtn('right', 'right');
 
-// MAPA S DVERAMI PODĽA TVOJHO ZADANIA
 const rooms = {
     kuchyna: { bg: 'kuchyna', doors: [{x: 400, y: 750, label: 'OBYVACKA', to: 'obyvacka'}] },
     spalna: { bg: 'spalna', doors: [{x: 400, y: 750, label: 'OBYVACKA', to: 'obyvacka'}] },
@@ -151,7 +149,7 @@ const rooms = {
     },
     dielna: { bg: 'dielna', doors: [
         {x: 400, y: 80, label: 'OBYVACKA', to: 'obyvacka'},
-        {x: 400, y: 720, label: 'VON', to: 'zahrada'} // Tu preskočíme chodbu ak nemáš obrázok
+        {x: 400, y: 720, label: 'VON', to: 'zahrada'}
     ]},
     zahrada: { bg: 'zahrada', doors: [{x: 400, y: 80, label: 'DOMOV', to: 'dielna'}] },
     kupelna: { bg: 'kupelna', doors: [{x: 80, y: 400, label: 'OBYVACKA', to: 'obyvacka'}] }
